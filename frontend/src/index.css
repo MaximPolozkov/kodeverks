@@ -1,0 +1,191 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    /* Не даём iOS/Android увеличивать шрифт при повороте экрана */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-paper font-sans text-ink antialiased;
+    font-size: 17px;
+    line-height: 1.55;
+    text-rendering: optimizeLegibility;
+    /* Страница никогда не скроллится по горизонтали */
+    overflow-x: hidden;
+  }
+  @media (max-width: 399px) {
+    body {
+      font-size: 16px;
+    }
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+    letter-spacing: -0.01em;
+    overflow-wrap: break-word;
+  }
+  img,
+  svg,
+  video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Фокус: старые Safari (< 15.4) не знают :focus-visible — для них обводка на :focus */
+  :focus {
+    outline: 3px solid #f3c34a;
+    outline-offset: 2px;
+  }
+  @supports selector(:focus-visible) {
+    :focus:not(:focus-visible) {
+      outline: none;
+    }
+  }
+
+  /* Поля ввода выглядят одинаково во всех браузерах */
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+  }
+  select.input {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding-right: 2.5rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%235B6877' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.9rem center;
+    background-size: 12px 8px;
+  }
+  select.input::-ms-expand {
+    display: none;
+  }
+  /* iOS Safari: пустое поле даты схлопывается по высоте и центрирует текст */
+  input[type='date'].input {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    text-align: left;
+  }
+  input[type='date']::-webkit-date-and-time-value {
+    text-align: left;
+  }
+  input[type='search']::-webkit-search-decoration {
+    -webkit-appearance: none;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+  /* Скрытые ползунки у числовых полей на телефонах мешают вводу */
+  @media (pointer: coarse) {
+    input[type='number']::-webkit-inner-spin-button,
+    input[type='number']::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Боковые отступы учитывают вырезы экрана в горизонтальной ориентации */
+  .page {
+    @apply mx-auto w-full max-w-page;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+  @media (min-width: 640px) {
+    .page {
+      padding-left: max(1.5rem, env(safe-area-inset-left));
+      padding-right: max(1.5rem, env(safe-area-inset-right));
+    }
+  }
+  @media (min-width: 1024px) {
+    .page {
+      padding-left: max(2rem, env(safe-area-inset-left));
+      padding-right: max(2rem, env(safe-area-inset-right));
+    }
+  }
+
+  /* Полная высота экрана без «прыжков» адресной строки на телефонах */
+  .min-h-screen-safe {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  .h-screen-safe {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .input {
+    @apply block w-full rounded-md border border-line bg-white px-3 py-2.5 text-ink
+      placeholder:text-muted/70 focus:border-cobalt focus:outline-none focus:ring-2 focus:ring-cobalt/25
+      disabled:bg-paper;
+    /* 16px — иначе iOS Safari увеличивает страницу при фокусе на поле */
+    font-size: 16px;
+    min-height: 2.75rem;
+  }
+  .input-error {
+    @apply border-danger focus:border-danger focus:ring-danger/20;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-center text-[15px] font-semibold
+      transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+    /* Удобная цель для пальца — не меньше 44px */
+    min-height: 2.75rem;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .btn-primary {
+    @apply btn bg-cobalt text-white hover:bg-cobalt-dark;
+  }
+  .btn-ink {
+    @apply btn bg-ink text-white hover:bg-ink-soft;
+  }
+  .btn-ghost {
+    @apply btn border border-line bg-white text-ink hover:border-ink/40;
+  }
+  .btn-danger {
+    @apply btn border border-danger/30 bg-white text-danger hover:bg-danger/5;
+  }
+  .label {
+    @apply mb-1.5 block text-[14px] font-semibold text-ink;
+  }
+  .panel {
+    @apply rounded-lg border border-line bg-white;
+  }
+  /* Длинные email, ссылки и слова переносятся, а не ломают вёрстку */
+  .break-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  /* Горизонтальная прокрутка вкладок без видимой полосы */
+  .scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .scroll-x::-webkit-scrollbar {
+    display: none;
+  }
+}

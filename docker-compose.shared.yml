@@ -1,0 +1,17 @@
+# Сервер, где уже работает другой сайт (порты 80/443 заняты его веб-сервером).
+# Наш сайт слушает только 127.0.0.1:8081, а внешний веб-сервер проксирует kodverks.ru сюда.
+services:
+  frontend:
+    ports: !reset ["127.0.0.1:8081:80"]
+  backend:
+    deploy:
+      resources: { limits: { memory: 384m } }
+  worker:
+    deploy:
+      resources: { limits: { memory: 256m } }
+  db:
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=30"]
+    deploy:
+      resources: { limits: { memory: 256m } }
+  redis:
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
