@@ -86,7 +86,8 @@ async def run_search(session: AsyncSession, *, force: bool = False) -> BotRun | 
             continue
         source = get_source(LeadSource(source_name), config.web_sites)
         if not source.configured:
-            logger.add("info", f"{source_name}: ключи не заданы, пропускаю")
+            hint = " (нужен VK_USER_TOKEN — ключ пользователя)" if source_name == LeadSource.vk else ""
+            logger.add("info", f"{source_name}: ключи не заданы, пропускаю{hint}")
             continue
         try:
             posts = await source.search(config.keywords, config.search_limit)

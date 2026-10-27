@@ -22,7 +22,9 @@ class VKSource(Source):
 
     @property
     def configured(self) -> bool:
-        return bool(settings.vk_user_token or settings.vk_group_token)
+        # Поиск постов (newsfeed.search) работает только с ключом пользователя;
+        # ключ сообщества годится лишь для сообщений
+        return bool(settings.vk_user_token)
 
     async def _call(self, method: str, token: str | None, **params) -> dict | list | int:
         if not token:
