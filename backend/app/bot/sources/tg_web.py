@@ -3,6 +3,8 @@
 Не требует вступления и ключей: это та же страница, что видит любой посетитель
 в браузере. Закрытые группы так прочитать нельзя — туда нужно добавить бота.
 """
+from app.core.config import settings
+
 
 import html
 import re
@@ -70,7 +72,7 @@ def parse_page(username: str, page: str) -> ChannelPage:
 
 
 async def fetch_channel(client: httpx.AsyncClient, username: str) -> ChannelPage | None:
-    resp = await client.get(f"https://t.me/s/{username}", follow_redirects=False)
+    resp = await client.get(f"{settings.telegram_web_base.rstrip('/')}/s/{username}", follow_redirects=False)
     if resp.status_code != 200:
         return None
     # Если канала нет или он закрыт, Telegram отдаёт страницу без ленты

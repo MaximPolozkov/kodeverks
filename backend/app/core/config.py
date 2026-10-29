@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     telegram_proxy: str | None = None
     # Альтернативный адрес Bot API (например, свой воркер-прокси)
     telegram_api_base: str = "https://api.telegram.org"
+    # Адрес веб-версии каналов (t.me) — можно направить через тот же воркер
+    telegram_web_base: str = "https://t.me"
     serpapi_key: str | None = None
 
     # Бот: LLM (anthropic | openai | none)
