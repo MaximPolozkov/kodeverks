@@ -11,7 +11,7 @@ from app.bot.scoring import score_text
 from app.bot.sources import FoundPost, SourceError, get_source
 from app.bot.store import is_stopped, load_settings, new_public_token, within_limits
 from app.services.notify import notify_new_lead
-from app.services.places import upsert_place, watched_channels
+from app.services.places import purge_junk_places, upsert_place, watched_channels
 from app.models import BotRun, Lead, LeadSource, LeadStatus
 from app.schemas.bot import BotSettingsData
 
@@ -99,6 +99,7 @@ async def run_search(session: AsyncSession, *, force: bool = False) -> BotRun | 
     await session.commit()
     logger = RunLog(run)
     logger.add("info", "Запуск поиска")
+    await purge_junk_places(session)
 
     for source_name, limits in config.sources.items():
         if not limits.enabled:

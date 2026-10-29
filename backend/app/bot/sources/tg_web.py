@@ -3,14 +3,13 @@
 Не требует вступления и ключей: это та же страница, что видит любой посетитель
 в браузере. Закрытые группы так прочитать нельзя — туда нужно добавить бота.
 """
-from app.core.config import settings
-
-
 import html
 import re
 from dataclasses import dataclass, field
 
 import httpx
+
+from app.core.config import settings
 
 USERNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{3,31}$")
 POST_RE = re.compile(
@@ -21,6 +20,16 @@ TEXT_RE = re.compile(r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</di
 TITLE_RE = re.compile(r'<meta property="og:title" content="([^"]*)"')
 AUTHOR_RE = re.compile(r'<span class="tgme_widget_message_from_author"[^>]*>(.*?)</span>', re.S)
 LINK_RE = re.compile(r"(?:https?://)?t\.me/(?:s/)?([A-Za-z][A-Za-z0-9_]{3,31})(?![A-Za-z0-9_/])")
+DATE_RE = re.compile(r'<time[^>]*datetime="([^"]+)"')
+# Упоминания людей и ботов — не площадки; берём только похожие на чаты/каналы с заказами
+PLACE_HINTS = ("chat", "group", "work", "job", "freelanc", "frilan", "zakaz", "order", "vakans", "remote", "udalen", "birzha", "it_")
+
+
+def looks_like_place(name: str) -> bool:
+    low = name.lower()
+    return not low.endswith("bot") and any(h in low for h in PLACE_HINTS)
+
+
 SKIP_NAMES = {"joinchat", "share", "addstickers", "proxy", "socks", "iv", "c", "s", "addlist", "boost"}
 
 
@@ -30,6 +39,7 @@ class ChannelPost:
     post_id: str
     text: str
     author: str | None = None
+    date: str | None = None
 
 
 @dataclass
@@ -61,12 +71,16 @@ def parse_page(username: str, page: str) -> ChannelPage:
         if not text_match:
             continue
         author = AUTHOR_RE.search(body)
+        date = DATE_RE.search(body)
         result.posts.append(
-            ChannelPost(channel, post_id, _clean(text_match.group(1)), _clean(author.group(1)) if author else None)
+            ChannelPost(
+                channel, post_id, _clean(text_match.group(1)),
+                _clean(author.group(1)) if author else None, date.group(1) if date else None,
+            )
         )
         for name in LINK_RE.findall(text_match.group(1)):
             norm = normalize_username(name)
-            if norm and norm.lower() != username.lower():
+            if norm and norm.lower() != username.lower() and looks_like_place(norm):
                 result.mentioned.add(norm)
     return result
 

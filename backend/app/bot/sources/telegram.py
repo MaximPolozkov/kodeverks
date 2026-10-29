@@ -48,6 +48,8 @@ class TelegramSource(Source):
                     continue
                 self.pages[username] = page
                 for p in page.posts[-limit:]:
+                    if _too_old(p.date):
+                        continue
                     posts.append(
                         FoundPost(
                             source=self.name,
@@ -145,3 +147,21 @@ def parse_membership(update: dict) -> dict | None:
         "place_url": f"https://t.me/{username}" if username else None,
         "bot_added": status in {"member", "administrator"},
     }
+
+
+MAX_AGE_DAYS = 14
+
+
+def _too_old(value: str | None) -> bool:
+    """Старые объявления уже неактуальны — пропускаем всё старше двух недель."""
+    if not value:
+        return False
+    from datetime import UTC, datetime, timedelta
+
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt < datetime.now(UTC) - timedelta(days=MAX_AGE_DAYS)

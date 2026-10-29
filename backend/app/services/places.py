@@ -55,3 +55,19 @@ async def watched_channels(session: AsyncSession) -> list[str]:
         select(ChatPlace.key).where(ChatPlace.watch.is_(True), ChatPlace.hidden.is_(False))
     )
     return list(rows)
+
+
+async def purge_junk_places(session) -> None:
+    """Убирает упоминания людей/ботов, попавшие в площадки ранее."""
+    from sqlalchemy import delete
+
+    from app.bot.sources.tg_web import looks_like_place
+
+    rows = await session.scalars(
+        select(ChatPlace).where(
+            ChatPlace.found_count == 0, ChatPlace.bot_added.is_(False), ChatPlace.watch.is_(False)
+        )
+    )
+    junk = [r.id for r in rows if not looks_like_place(r.key)]
+    if junk:
+        await session.execute(delete(ChatPlace).where(ChatPlace.id.in_(junk)))
