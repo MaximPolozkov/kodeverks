@@ -55,9 +55,8 @@ class BotSettingsData(BaseModel):
     web_sites: list[str] = Field(default_factory=list, description="Домены для поиска через SerpAPI")
     tg_channels: list[str] = Field(
         default_factory=lambda: [
-            "freegolup", "workk_on", "allgigs", "FreeWorkFeed", "FrWork3", "frilancekomfort",
-            "kadrof_work", "distantsiya", "tgjob", "onlinevakansii", "Getitrussia", "devjobs",
-            "vakansii_it", "remote_w0rk",
+            "zakazy_it", "freegolup", "allgigs", "FreeWorkFeed", "FrWork3", "frilancekomfort",
+            "workk_on", "freelancce", "javascript_jobs_feed", "designbirzha", "cgfreelance",
         ],
         description="Публичные Telegram-каналы для чтения через t.me/s/",
     )
