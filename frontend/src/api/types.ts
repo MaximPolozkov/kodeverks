@@ -106,6 +106,8 @@ export interface BotSettingsData {
   stop_words: string[]
   sources: Record<LeadSource, SourceLimits>
   web_sites: string[]
+  tg_channels: string[]
+  notify_vk: boolean
   min_score: number
   auto_contact: boolean
   schedule_minutes: number
@@ -173,4 +175,23 @@ export interface FunnelStats {
   converted: number
   opted_out: number
   by_source: Record<string, number>
+}
+
+export interface Place {
+  id: number
+  key: string
+  title: string | null
+  url: string | null
+  kind: 'channel' | 'group' | 'unknown' | string
+  found_count: number
+  bot_added: boolean
+  watch: boolean
+  hidden: boolean
+  last_found_at: string | null
+  created_at: string
+}
+
+export interface PlacesResponse {
+  items: Place[]
+  bot_username: string | null
 }

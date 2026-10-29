@@ -44,7 +44,7 @@ async def main() -> int:
         r = (await c.post(api + "setWebhook", json={
             "url": url,
             "secret_token": settings.telegram_webhook_secret,
-            "allowed_updates": ["message", "channel_post"],
+            "allowed_updates": ["message", "channel_post", "my_chat_member"],
             "drop_pending_updates": True,
         })).json()
         print(("✓ Вебхук: " + url) if r.get("ok") else f"✗ setWebhook: {r.get('description')}")

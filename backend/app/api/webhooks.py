@@ -10,7 +10,8 @@ from fastapi.responses import PlainTextResponse
 from app.bot.dialog import handle_incoming
 from app.bot.runner import save_post_as_lead
 from app.bot.sources import FoundPost
-from app.bot.sources.telegram import parse_update
+from app.bot.sources.telegram import parse_membership, parse_update
+from app.services.places import upsert_place
 from app.bot.store import load_settings
 from app.core.config import settings
 from app.core.db import SessionLocal
@@ -36,9 +37,23 @@ async def _process_private(post: FoundPost) -> None:
 async def _process_group(post: FoundPost) -> None:
     async with SessionLocal() as session:
         enabled, config = await load_settings(session)
+        # Бот получает сообщения из чата — значит он там есть
+        await upsert_place(
+            session, post.extra["place"], title=post.extra.get("place_title"),
+            url=post.extra.get("place_url"), kind=post.extra.get("place_kind"), bot_added=True,
+        )
         limits = config.sources.get(LeadSource.telegram)
         if enabled and limits and limits.enabled:
             await save_post_as_lead(session, post, config)
+        await session.commit()
+
+
+async def _process_membership(info: dict) -> None:
+    async with SessionLocal() as session:
+        await upsert_place(
+            session, info["place"], title=info.get("place_title"), url=info.get("place_url"),
+            kind=info.get("place_kind"), bot_added=info["bot_added"],
+        )
         await session.commit()
 
 
@@ -50,7 +65,12 @@ async def telegram_webhook(
 ) -> dict:
     if not _same(secret, settings.telegram_webhook_secret):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Неверный секрет")
-    parsed = parse_update(await request.json())
+    update = await request.json()
+    membership = parse_membership(update)
+    if membership is not None:
+        background.add_task(_process_membership, membership)
+        return {"ok": True}
+    parsed = parse_update(update)
     if parsed is not None:
         kind, post = parsed
         background.add_task(_process_private if kind == "private" else _process_group, post)

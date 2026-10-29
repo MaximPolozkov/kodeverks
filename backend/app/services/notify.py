@@ -175,3 +175,32 @@ async def notify_new_order(snapshot: OrderSnapshot) -> bool:
     except Exception:  # noqa: BLE001
         log.exception("Не удалось отметить уведомление заказа №%s", snapshot.id)
     return True
+
+
+SERVICE_LABELS = {"website": "сайт", "bot": "бот", "crm": "CRM", "app": "приложение"}
+
+
+async def notify_new_lead(lead_id: int, text: str, score: int, service: str | None,
+                          post_url: str | None, place_title: str | None) -> bool:
+    """Оповещение во ВКонтакте о найденном подходящем запросе."""
+    if not notifications_enabled():
+        return False
+    snippet = text if len(text) <= 500 else text[:497] + "…"
+    lines = [f"🔎 Найден запрос №{lead_id} (релевантность {score})"]
+    if place_title:
+        lines.append(f"Где: {place_title}")
+    if service:
+        lines.append(f"Похоже на: {SERVICE_LABELS.get(service, service)}")
+    lines += ["", snippet]
+    buttons = []
+    if post_url and post_url.startswith("https://"):
+        buttons.append([{"action": {"type": "open_link", "link": post_url, "label": "Открыть сообщение"}}])
+    buttons.append([{"action": {"type": "open_link",
+                                "link": f"{settings.site_url.rstrip('/')}/admin/bot/leads/{lead_id}",
+                                "label": "Лид в админке"}}])
+    try:
+        await send_vk("\n".join(lines), {"inline": True, "buttons": buttons})
+        return True
+    except Exception:  # noqa: BLE001
+        log.exception("Не удалось отправить оповещение о лиде №%s", lead_id)
+        return False

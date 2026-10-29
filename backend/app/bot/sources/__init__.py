@@ -5,11 +5,13 @@ from app.bot.sources.web import WebSource
 from app.models.enums import LeadSource
 
 
-def get_source(name: LeadSource, web_sites: list[str] | None = None) -> Source:
+def get_source(
+    name: LeadSource, web_sites: list[str] | None = None, tg_channels: list[str] | None = None
+) -> Source:
     if name == LeadSource.vk:
         return VKSource()
     if name == LeadSource.telegram:
-        return TelegramSource()
+        return TelegramSource(tg_channels)
     return WebSource(web_sites)
 
 

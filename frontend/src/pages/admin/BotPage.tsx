@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { api, buildQuery } from '@/api/client'
-import type { BotRun, BotSettings, BotSettingsData, BotStatus, FunnelStats, Lead, LeadSource, LeadStatus, Page } from '@/api/types'
+import type { BotRun, BotSettings, BotSettingsData, BotStatus, FunnelStats, Lead, LeadSource, LeadStatus, Page, Place, PlacesResponse } from '@/api/types'
 import { Badge, EmptyState, ErrorNote, PageHeader, Pagination, Spinner } from '@/components/ui/misc'
 import { formatDateTime, leadSourceLabels, leadStatusLabels, leadStatusTone, serviceLabels } from '@/lib/labels'
 
 const TABS = [
   { id: 'overview', label: 'Обзор' },
   { id: 'leads', label: 'Лиды' },
+  { id: 'places', label: 'Площадки' },
   { id: 'settings', label: 'Настройки' },
   { id: 'log', label: 'Журнал' },
 ] as const
@@ -40,6 +41,7 @@ export default function BotPage() {
       <div role="tabpanel">
         {tab === 'overview' && <Overview />}
         {tab === 'leads' && <Leads />}
+        {tab === 'places' && <Places />}
         {tab === 'settings' && <SettingsTab />}
         {tab === 'log' && <RunLog />}
       </div>
@@ -273,6 +275,95 @@ function Leads() {
   )
 }
 
+/* ---------- Площадки ---------- */
+
+const kindLabels: Record<string, string> = { channel: 'Канал', group: 'Группа', unknown: 'Чат' }
+
+function Places() {
+  const client = useQueryClient()
+  const places = useQuery({
+    queryKey: ['bot', 'places'],
+    queryFn: () => api<PlacesResponse>('/api/admin/bot/places'),
+  })
+  const update = useMutation({
+    mutationFn: ({ id, ...body }: { id: number; watch?: boolean; hidden?: boolean }) =>
+      api<Place>(`/api/admin/bot/places/${id}`, { method: 'PATCH', json: body }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['bot', 'places'] }),
+  })
+
+  if (places.isLoading) return <Spinner />
+  if (places.isError) return <ErrorNote error={places.error} />
+  const { items, bot_username } = places.data!
+  // Ссылка Telegram «добавить бота в группу»: пользователь выбирает чат сам
+  const addLink = bot_username ? `https://t.me/${bot_username}?startgroup=kodverk` : null
+
+  return (
+    <>
+      <p className="mb-4 max-w-prose text-[15px] text-muted">
+        Чаты и каналы, где бот нашёл подходящие запросы или упоминания. Откройте площадку, чтобы посмотреть её.
+        В группу можно добавить бота кнопкой «Добавить бота» — после этого он будет искать заказы и там.
+        Открытые каналы бот читает и без добавления, если включить «Следить».
+      </p>
+      {update.isError && <ErrorNote error={update.error} />}
+      {items.length === 0 ? (
+        <EmptyState title="Площадок пока нет">
+          Они появятся после первого поиска: нажмите «Искать сейчас» на вкладке «Обзор».
+        </EmptyState>
+      ) : (
+        <ul className="space-y-3">
+          {items.map((p) => (
+            <li key={p.id} className="panel p-3 xs:p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="break-anywhere font-semibold">{p.title || `@${p.key}`}</p>
+                  <p className="text-[14px] text-muted">
+                    {kindLabels[p.kind] ?? 'Чат'} · найдено запросов: {p.found_count}
+                    {p.last_found_at ? `, последний ${formatDateTime(p.last_found_at)}` : ''}
+                  </p>
+                </div>
+                {p.bot_added ? (
+                  <Badge tone="bg-ok/10 text-ok border-ok/30">Бот добавлен</Badge>
+                ) : p.watch ? (
+                  <Badge tone="bg-cobalt-tint text-cobalt-dark border-cobalt/30">Бот следит</Badge>
+                ) : null}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {p.url && (
+                  <a href={p.url} target="_blank" rel="noopener noreferrer" className="btn-ghost">
+                    Открыть
+                  </a>
+                )}
+                {!p.bot_added && p.kind !== 'channel' && addLink && (
+                  <a href={addLink} target="_blank" rel="noopener noreferrer" className="btn-primary">
+                    Добавить бота
+                  </a>
+                )}
+                {p.kind !== 'group' && !p.key.startsWith('-') && (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => update.mutate({ id: p.id, watch: !p.watch })}
+                  >
+                    {p.watch ? 'Не следить' : 'Следить'}
+                  </button>
+                )}
+                <button type="button" className="btn-ghost" onClick={() => update.mutate({ id: p.id, hidden: true })}>
+                  Скрыть
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!bot_username && (
+        <p className="mt-4 text-[14px] text-muted">
+          Кнопка «Добавить бота» появится, когда на сервере будет задан TELEGRAM_BOT_TOKEN.
+        </p>
+      )}
+    </>
+  )
+}
+
 /* ---------- Настройки ---------- */
 
 const listToText = (list: string[]) => list.join('\n')
@@ -286,7 +377,7 @@ function SettingsTab() {
   const client = useQueryClient()
   const settings = useQuery({ queryKey: ['bot', 'settings'], queryFn: () => api<BotSettings>('/api/admin/bot/settings') })
   const [draft, setDraft] = useState<BotSettingsData | null>(null)
-  const [lists, setLists] = useState({ keywords: '', stop_words: '', web_sites: '' })
+  const [lists, setLists] = useState({ keywords: '', stop_words: '', web_sites: '', tg_channels: '' })
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -296,6 +387,7 @@ function SettingsTab() {
         keywords: listToText(settings.data.data.keywords),
         stop_words: listToText(settings.data.data.stop_words),
         web_sites: listToText(settings.data.data.web_sites),
+        tg_channels: listToText(settings.data.data.tg_channels ?? []),
       })
     }
   }, [settings.data, draft])
@@ -324,6 +416,7 @@ function SettingsTab() {
       keywords: textToList(lists.keywords),
       stop_words: textToList(lists.stop_words),
       web_sites: textToList(lists.web_sites),
+      tg_channels: textToList(lists.tg_channels),
     })
 
   return (
@@ -412,6 +505,38 @@ function SettingsTab() {
             </div>
           ))}
         </div>
+        <div className="mt-4">
+          <label htmlFor="tg_channels" className="label">
+            Открытые Telegram-каналы с заказами
+          </label>
+          <textarea
+            id="tg_channels"
+            rows={5}
+            className="input"
+            placeholder="freegolup"
+            value={lists.tg_channels}
+            onChange={(e) => {
+              setSaved(false)
+              setLists({ ...lists, tg_channels: e.target.value })
+            }}
+          />
+          <p className="mt-1.5 text-[14px] text-muted">
+            По одному на строку: имя канала или ссылка t.me/… Бот читает их без вступления. Каналы, отмеченные
+            «Следить» во вкладке «Площадки», добавляются к этому списку.
+          </p>
+        </div>
+        <label className="mt-4 flex min-h-[44px] items-start gap-3 text-[15px]">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 accent-cobalt"
+            checked={draft.notify_vk ?? true}
+            onChange={(e) => set('notify_vk', e.target.checked)}
+          />
+          <span>
+            <span className="font-semibold">Оповещать во ВКонтакте о новых лидах</span>
+            <span className="block text-muted">Сообщение придёт тем же получателям, что и уведомления о заказах.</span>
+          </span>
+        </label>
         <div className="mt-4">
           <label htmlFor="web_sites" className="label">
             Сайты для поиска (биржи, форумы)

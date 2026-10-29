@@ -48,11 +48,20 @@ class BotSettingsData(BaseModel):
     sources: dict[LeadSource, SourceLimits] = Field(
         default_factory=lambda: {
             LeadSource.vk: SourceLimits(),
-            LeadSource.telegram: SourceLimits(per_hour=0, per_day=0),
+            LeadSource.telegram: SourceLimits(per_hour=0, per_day=0),  # писать первым в TG нельзя
             LeadSource.web: SourceLimits(per_hour=0, per_day=0),
         }
     )
     web_sites: list[str] = Field(default_factory=list, description="Домены для поиска через SerpAPI")
+    tg_channels: list[str] = Field(
+        default_factory=lambda: [
+            "freegolup", "workk_on", "allgigs", "FreeWorkFeed", "FrWork3", "frilancekomfort",
+            "kadrof_work", "distantsiya", "tgjob", "onlinevakansii", "Getitrussia", "devjobs",
+            "vakansii_it", "remote_w0rk",
+        ],
+        description="Публичные Telegram-каналы для чтения через t.me/s/",
+    )
+    notify_vk: bool = True
     min_score: int = Field(default=50, ge=0, le=100)
     auto_contact: bool = False
     schedule_minutes: int = Field(default=60, ge=15, le=24 * 60)
@@ -132,3 +141,27 @@ class FunnelStats(BaseModel):
 
 
 BotStatus.model_rebuild()
+
+
+class PlaceOut(ORMModel):
+    id: int
+    key: str
+    title: str | None
+    url: str | None
+    kind: str
+    found_count: int
+    bot_added: bool
+    watch: bool
+    hidden: bool
+    last_found_at: datetime | None
+    created_at: datetime
+
+
+class PlaceUpdate(BaseModel):
+    watch: bool | None = None
+    hidden: bool | None = None
+
+
+class PlacesOut(BaseModel):
+    items: list[PlaceOut]
+    bot_username: str | None

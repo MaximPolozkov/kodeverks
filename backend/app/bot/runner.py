@@ -10,6 +10,8 @@ from app.bot.dialog import first_message, send
 from app.bot.scoring import score_text
 from app.bot.sources import FoundPost, SourceError, get_source
 from app.bot.store import is_stopped, load_settings, new_public_token, within_limits
+from app.services.notify import notify_new_lead
+from app.services.places import upsert_place, watched_channels
 from app.models import BotRun, Lead, LeadSource, LeadStatus
 from app.schemas.bot import BotSettingsData
 
@@ -58,6 +60,23 @@ async def save_post_as_lead(
     )
     session.add(lead)
     await session.flush()
+
+    place_key = post.extra.get("place")
+    if place_key:
+        await upsert_place(
+            session,
+            place_key,
+            title=post.extra.get("place_title"),
+            url=post.extra.get("place_url"),
+            kind=post.extra.get("place_kind"),
+            found=1,
+            bot_added=post.extra.get("bot_added"),
+        )
+    if config.notify_vk:
+        await notify_new_lead(
+            lead.id, lead.request_text, lead.relevance_score, lead.service_guess,
+            lead.post_url, post.extra.get("place_title"),
+        )
     return lead
 
 
@@ -84,7 +103,8 @@ async def run_search(session: AsyncSession, *, force: bool = False) -> BotRun | 
     for source_name, limits in config.sources.items():
         if not limits.enabled:
             continue
-        source = get_source(LeadSource(source_name), config.web_sites)
+        channels = config.tg_channels + await watched_channels(session) if source_name == LeadSource.telegram else None
+        source = get_source(LeadSource(source_name), config.web_sites, channels)
         if not source.configured:
             hint = " (нужен VK_USER_TOKEN — ключ пользователя)" if source_name == LeadSource.vk else ""
             logger.add("info", f"{source_name}: ключи не заданы, пропускаю{hint}")
@@ -122,6 +142,11 @@ async def run_search(session: AsyncSession, *, force: bool = False) -> BotRun | 
                 logger.add("error", f"{source_name}: не удалось написать лиду #{lead.id} — {exc}")
             await session.commit()
 
+        # Чаты, которые упоминаются в прочитанных каналах, — кандидаты в площадки
+        for page in getattr(source, "pages", {}).values():
+            await upsert_place(session, page.username, title=page.title, kind="channel")
+            for name in list(page.mentioned)[:20]:
+                await upsert_place(session, name)
         logger.add("info", f"{source_name}: найдено {len(posts)}, новых лидов {new_leads}")
         await session.commit()
 

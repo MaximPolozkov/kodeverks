@@ -1,4 +1,4 @@
-from app.models.bot import BotMessage, BotRun, BotSettings, BotStopList, Lead
+from app.models.bot import BotMessage, BotRun, BotSettings, BotStopList, ChatPlace, Lead
 from app.models.enums import (
     ContactChannel,
     LeadSource,
@@ -17,6 +17,7 @@ __all__ = [
     "BotRun",
     "BotSettings",
     "BotStopList",
+    "ChatPlace",
     "ContactChannel",
     "Lead",
     "LeadSource",

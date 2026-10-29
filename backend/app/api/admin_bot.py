@@ -9,7 +9,7 @@ from app.bot.sources import SourceError, get_source
 from app.bot.store import get_settings_row, load_settings
 from app.core.config import settings
 from app.core.deps import SessionDep, StaffUser
-from app.models import BotMessage, BotRun, Lead, LeadSource, LeadStatus, MessageDirection
+from app.models import BotMessage, BotRun, ChatPlace, Lead, LeadSource, LeadStatus, MessageDirection
 from app.schemas.bot import (
     BotMessageOut,
     BotRunOut,
@@ -20,6 +20,9 @@ from app.schemas.bot import (
     LeadOut,
     LeadUpdate,
     ManualMessageIn,
+    PlaceOut,
+    PlacesOut,
+    PlaceUpdate,
 )
 from app.schemas.common import Page
 
@@ -82,7 +85,7 @@ async def bot_status(session: SessionDep, _: StaffUser) -> BotStatus:
         worker_available=await _redis_alive(),
         last_run=BotRunOut.model_validate(last) if last else None,
         sources_configured={
-            s.value: get_source(s, config.web_sites).configured for s in LeadSource
+            s.value: get_source(s, config.web_sites, config.tg_channels).configured for s in LeadSource
         },
         llm_configured=llm_configured(),
     )
@@ -254,3 +257,54 @@ async def funnel(session: SessionDep, _: StaffUser) -> FunnelStats:
         opted_out=await count(Lead.status == LeadStatus.opted_out),
         by_source={str(src): n for src, n in by_source_rows.all()},
     )
+
+
+# --- Площадки (чаты и каналы) ---
+
+_bot_username: str | None = None
+
+
+async def _get_bot_username() -> str | None:
+    global _bot_username
+    if _bot_username or not settings.telegram_bot_token:
+        return _bot_username
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            body = (await client.get(f"https://api.telegram.org/bot{settings.telegram_bot_token}/getMe")).json()
+        _bot_username = body.get("result", {}).get("username")
+    except Exception:  # noqa: BLE001
+        return None
+    return _bot_username
+
+
+@router.get("/places", response_model=PlacesOut)
+async def list_places(
+    session: SessionDep, _: StaffUser, show_hidden: bool = False
+) -> PlacesOut:
+    stmt = select(ChatPlace)
+    if not show_hidden:
+        stmt = stmt.where(ChatPlace.hidden.is_(False))
+    rows = await session.scalars(
+        stmt.order_by(desc(ChatPlace.found_count), desc(ChatPlace.bot_added), desc(ChatPlace.id)).limit(500)
+    )
+    return PlacesOut(
+        items=[PlaceOut.model_validate(r) for r in rows], bot_username=await _get_bot_username()
+    )
+
+
+@router.patch("/places/{place_id}", response_model=PlaceOut)
+async def update_place(
+    place_id: int, data: PlaceUpdate, session: SessionDep, _: StaffUser
+) -> ChatPlace:
+    place = await session.get(ChatPlace, place_id)
+    if place is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Площадка не найдена")
+    if data.watch is not None:
+        place.watch = data.watch
+    if data.hidden is not None:
+        place.hidden = data.hidden
+    await session.commit()
+    await session.refresh(place)
+    return place

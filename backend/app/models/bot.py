@@ -114,3 +114,27 @@ class BotRun(Base):
     contacted_count: Mapped[int] = mapped_column(Integer, default=0)
     errors: Mapped[int] = mapped_column(Integer, default=0)
     log: Mapped[list] = mapped_column(JSONType, default=list)
+
+
+class ChatPlace(Base):
+    """Площадка (Telegram-чат или канал), где встречаются подходящие запросы."""
+
+    __tablename__ = "chat_places"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    platform: Mapped[str] = mapped_column(String(16), default="telegram")
+    # @username публичного чата/канала или числовой id закрытой группы
+    key: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    title: Mapped[str | None] = mapped_column(String(255))
+    url: Mapped[str | None] = mapped_column(String(500))
+    kind: Mapped[str] = mapped_column(String(16), default="channel")  # channel | group | unknown
+    found_count: Mapped[int] = mapped_column(Integer, default=0)
+    # Бот добавлен в этот чат и получает сообщения
+    bot_added: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Сканировать публичную веб-версию (t.me/s/...) без вступления
+    watch: Mapped[bool] = mapped_column(Boolean, default=False)
+    hidden: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_found_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

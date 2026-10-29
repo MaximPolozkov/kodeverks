@@ -11,20 +11,52 @@ Bot API не умеет искать по всему Telegram. Бот видит
 import httpx
 
 from app.bot.sources.base import FoundPost, Source, SourceError
+from app.bot.sources.tg_web import ChannelPage, fetch_channel, normalize_username
 from app.core.config import settings
 from app.models.enums import LeadSource
 
 
 class TelegramSource(Source):
+    """Два режима: чтение публичных каналов (t.me/s/...) и вебхук для чатов с ботом."""
+
     name = LeadSource.telegram
+
+    def __init__(self, channels: list[str] | None = None) -> None:
+        self.channels = [c for c in (normalize_username(x) for x in channels or []) if c]
+        # Заполняется при поиске: какие каналы прочитаны и какие чаты упоминались
+        self.pages: dict[str, ChannelPage] = {}
 
     @property
     def configured(self) -> bool:
-        return bool(settings.telegram_bot_token)
+        return bool(self.channels or settings.telegram_bot_token)
 
     async def search(self, keywords: list[str], limit: int) -> list[FoundPost]:
-        # Поиск пассивный: посты приходят через вебхук, см. parse_group_message
-        return []
+        posts: list[FoundPost] = []
+        if not self.channels:
+            return posts
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; KodverkLeadBot/1.0)", "Accept-Language": "ru"}
+        async with httpx.AsyncClient(timeout=self.timeout, headers=headers) as client:
+            for username in self.channels:
+                try:
+                    page = await fetch_channel(client, username)
+                except httpx.HTTPError as exc:
+                    raise SourceError(f"t.me/s/{username}: {exc}") from exc
+                if page is None:
+                    continue
+                self.pages[username] = page
+                for p in page.posts[-limit:]:
+                    posts.append(
+                        FoundPost(
+                            source=self.name,
+                            external_id=f"{p.channel}/{p.post_id}",
+                            text=p.text,
+                            author_name=p.author or page.title,
+                            post_url=f"https://t.me/{p.channel}/{p.post_id}",
+                            can_contact=False,
+                            extra={"place": username, "place_title": page.title, "place_kind": "channel"},
+                        )
+                    )
+        return posts
 
     async def send_message(self, author_external_id: str, text: str) -> None:
         if not settings.telegram_bot_token:
@@ -83,4 +115,28 @@ def parse_update(update: dict) -> tuple[str, FoundPost] | None:
         profile_url=profile_url,
         post_url=post_url,
         can_contact=False,
+        extra={
+            "place": chat_username or str(chat["id"]),
+            "place_title": chat.get("title"),
+            "place_kind": "channel" if chat_type == "channel" else "group",
+            "place_url": f"https://t.me/{chat_username}" if chat_username else None,
+            "bot_added": True,
+        },
     )
+
+
+def parse_membership(update: dict) -> dict | None:
+    """Бота добавили в чат или удалили из него (апдейт my_chat_member)."""
+    member = update.get("my_chat_member")
+    if not member:
+        return None
+    chat = member.get("chat", {})
+    status = (member.get("new_chat_member") or {}).get("status")
+    username = chat.get("username")
+    return {
+        "place": username or str(chat.get("id")),
+        "place_title": chat.get("title"),
+        "place_kind": "channel" if chat.get("type") == "channel" else "group",
+        "place_url": f"https://t.me/{username}" if username else None,
+        "bot_added": status in {"member", "administrator"},
+    }
