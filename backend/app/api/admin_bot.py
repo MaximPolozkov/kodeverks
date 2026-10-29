@@ -85,7 +85,7 @@ async def bot_status(session: SessionDep, _: StaffUser) -> BotStatus:
         worker_available=await _redis_alive(),
         last_run=BotRunOut.model_validate(last) if last else None,
         sources_configured={
-            s.value: get_source(s, config.web_sites, config.tg_channels).configured for s in LeadSource
+            s.value: get_source(s, config.web_sites, config.tg_channels, config.freelance_feeds).configured for s in LeadSource
         },
         llm_configured=llm_configured(),
     )

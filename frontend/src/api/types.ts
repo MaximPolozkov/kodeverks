@@ -2,7 +2,7 @@ export type UserRole = 'admin' | 'manager'
 export type ServiceType = 'website' | 'bot' | 'crm' | 'app'
 export type OrderStatus = 'new' | 'in_progress' | 'negotiation' | 'done' | 'rejected'
 export type OrderSource = 'site' | 'bot' | 'utm'
-export type LeadSource = 'vk' | 'telegram' | 'web'
+export type LeadSource = 'vk' | 'telegram' | 'web' | 'freelance'
 export type ContactChannel = 'email' | 'telegram' | 'vk' | 'whatsapp' | 'phone'
 export type LeadStatus =
   | 'found'
@@ -107,6 +107,7 @@ export interface BotSettingsData {
   sources: Record<LeadSource, SourceLimits>
   web_sites: string[]
   tg_channels: string[]
+  freelance_feeds?: string[]
   notify_vk: boolean
   min_score: number
   auto_contact: boolean

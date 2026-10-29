@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     telegram_webhook_secret: str | None = None
     # Прокси только для Telegram (http://user:pass@host:port или socks5://...)
     telegram_proxy: str | None = None
+    # Почта для бесплатного переводчика MyMemory (увеличивает суточный лимит)
+    translate_email: str | None = None
     # Альтернативный адрес Bot API (например, свой воркер-прокси)
     telegram_api_base: str = "https://api.telegram.org"
     # Адрес веб-версии каналов (t.me) — можно направить через тот же воркер

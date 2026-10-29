@@ -333,12 +333,12 @@ function Places() {
                     Открыть
                   </a>
                 )}
-                {!p.bot_added && p.kind !== 'channel' && addLink && (
+                {!p.bot_added && p.kind !== 'channel' && p.kind !== 'site' && addLink && (
                   <a href={addLink} target="_blank" rel="noopener noreferrer" className="btn-primary">
                     Добавить бота
                   </a>
                 )}
-                {p.kind !== 'group' && !p.key.startsWith('-') && (
+                {p.kind !== 'group' && p.kind !== 'site' && !p.key.startsWith('-') && (
                   <button
                     type="button"
                     className="btn-ghost"

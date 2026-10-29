@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.models.enums import LeadSource, LeadStatus, MessageDirection, ServiceType
 from app.schemas.common import ORMModel
@@ -23,6 +23,20 @@ DEFAULT_FIRST_MESSAGE = (
 )
 
 
+DEFAULT_KEYWORDS = [
+    "нужен сайт", "сделать сайт", "создать сайт", "разработать сайт", "разработка сайта",
+    "доработать сайт", "доработка сайта", "переделать сайт", "редизайн сайта", "лендинг",
+    "landing page", "интернет-магазин", "интернет магазин", "сайт на тильде", "сайт на wordpress",
+    "сайт на битрикс", "ищу разработчика", "ищу программиста", "ищу веб-разработчика",
+    "нужен программист", "нужен разработчик", "нужен телеграм бот", "нужен бот", "сделать бота",
+    "разработать бота", "чат-бот", "чат бот", "бот для telegram", "бот в телеграм", "бот для вк",
+    "мини-приложение telegram", "mini app", "парсер", "интеграция с api", "автоматизация",
+    "внедрить crm", "нужна crm", "настроить crm", "amocrm", "битрикс24", "crm-система",
+    "разработка приложения", "мобильное приложение", "приложение для android", "приложение для ios",
+    "веб-приложение", "личный кабинет", "админ-панель", "техническое задание",
+]
+
+
 class SourceLimits(BaseModel):
     enabled: bool = True
     per_hour: int = Field(default=5, ge=0, le=100)
@@ -30,18 +44,7 @@ class SourceLimits(BaseModel):
 
 
 class BotSettingsData(BaseModel):
-    keywords: list[str] = Field(
-        default_factory=lambda: [
-            "нужен сайт",
-            "ищу разработчика",
-            "сделать сайт",
-            "нужен телеграм бот",
-            "разработать бота",
-            "внедрить crm",
-            "нужна crm",
-            "разработка приложения",
-        ]
-    )
+    keywords: list[str] = Field(default_factory=lambda: list(DEFAULT_KEYWORDS))
     stop_words: list[str] = Field(
         default_factory=lambda: ["вакансия", "резюме", "ищу работу", "бесплатно", "даром"]
     )
@@ -50,7 +53,13 @@ class BotSettingsData(BaseModel):
             LeadSource.vk: SourceLimits(),
             LeadSource.telegram: SourceLimits(per_hour=0, per_day=0),  # писать первым в TG нельзя
             LeadSource.web: SourceLimits(per_hour=0, per_day=0),
+            LeadSource.freelance: SourceLimits(per_hour=0, per_day=0),
         }
+    )
+    # Биржи: русские и зарубежные (иностранные заказы переводятся на русский)
+    freelance_feeds: list[str] = Field(
+        default_factory=lambda: ["fl", "kwork", "freelancer", "reddit"],
+        description="fl, kwork, freelancer, reddit",
     )
     web_sites: list[str] = Field(default_factory=list, description="Домены для поиска через SerpAPI")
     tg_channels: list[str] = Field(
@@ -68,6 +77,14 @@ class BotSettingsData(BaseModel):
     first_message_template: str = Field(default=DEFAULT_FIRST_MESSAGE, max_length=2000)
     system_prompt: str = Field(default=DEFAULT_SYSTEM_PROMPT, max_length=8000)
     retention_days: int = Field(default=180, ge=7, le=3650)
+
+    @model_validator(mode="after")
+    def _fill_sources(self) -> "BotSettingsData":
+        # Новые источники появляются и у тех, кто сохранил настройки раньше
+        for src in LeadSource:
+            if src not in self.sources:
+                self.sources[src] = SourceLimits(per_hour=0, per_day=0)
+        return self
 
 
 class BotSettingsOut(BaseModel):

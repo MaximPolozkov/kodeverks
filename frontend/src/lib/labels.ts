@@ -43,7 +43,8 @@ export const orderSourceLabels: Record<OrderSource, string> = {
 export const leadSourceLabels: Record<LeadSource, string> = {
   vk: 'ВКонтакте',
   telegram: 'Telegram',
-  web: 'Сайты и биржи',
+  web: 'Поиск по сайтам',
+  freelance: 'Биржи фриланса',
 }
 
 export const leadStatusLabels: Record<LeadStatus, string> = {

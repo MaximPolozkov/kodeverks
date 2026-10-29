@@ -42,6 +42,9 @@ async def save_post_as_lead(
     if await is_stopped(session, post.source, post.author_external_id):
         return None
     score = score_text(post.text, config.keywords, config.stop_words)
+    if post.extra.get("is_order") and not score.blocked and score.service:
+        # С бирж приходят только заказы — намерение уже подтверждено
+        score.value = min(100, score.value + 20)
     if score.blocked or score.value < config.min_score:
         return None
     lead = Lead(
@@ -105,7 +108,13 @@ async def run_search(session: AsyncSession, *, force: bool = False) -> BotRun | 
         if not limits.enabled:
             continue
         channels = config.tg_channels + await watched_channels(session) if source_name == LeadSource.telegram else None
-        source = get_source(LeadSource(source_name), config.web_sites, channels)
+        source = get_source(LeadSource(source_name), config.web_sites, channels, config.freelance_feeds)
+        if hasattr(source, "is_known"):
+            async def _known(eid: str, _src=source_name) -> bool:
+                return await session.scalar(
+                    select(Lead.id).where(Lead.source == _src, Lead.external_id == eid)
+                ) is not None
+            source.is_known = _known
         if not source.configured:
             hint = " (нужен VK_USER_TOKEN — ключ пользователя)" if source_name == LeadSource.vk else ""
             logger.add("info", f"{source_name}: ключи не заданы, пропускаю{hint}")
@@ -119,7 +128,10 @@ async def run_search(session: AsyncSession, *, force: bool = False) -> BotRun | 
             continue
         failed = getattr(source, "failed", None)
         if failed:
-            logger.add("info", f"{source_name}: не открылись каналы — {', '.join(failed[:10])}")
+            logger.add("info", f"{source_name}: не ответили — {', '.join(failed[:10])}")
+        if getattr(source, "translated", 0) or getattr(source, "untranslated", 0):
+            logger.add("info", f"{source_name}: переведено иностранных заказов — {source.translated}"
+                       + (f", без перевода (лимит) — {source.untranslated}" if source.untranslated else ""))
         logger.add("info", f"{source_name}: просмотрено сообщений — {len(posts)}")
 
         new_leads = 0

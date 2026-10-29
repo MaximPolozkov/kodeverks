@@ -31,6 +31,7 @@ class LeadSource(StrEnum):
     vk = "vk"
     telegram = "telegram"
     web = "web"
+    freelance = "freelance"
 
 
 class LeadStatus(StrEnum):
