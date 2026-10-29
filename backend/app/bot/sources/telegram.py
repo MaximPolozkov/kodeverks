@@ -36,12 +36,14 @@ class TelegramSource(Source):
         if not self.channels:
             return posts
         headers = {"User-Agent": "Mozilla/5.0 (compatible; KodverkLeadBot/1.0)", "Accept-Language": "ru"}
+        self.failed: list[str] = []
         async with tg_client(timeout=self.timeout, headers=headers) as client:
             for username in self.channels:
                 try:
                     page = await fetch_channel(client, username)
                 except httpx.HTTPError as exc:
-                    raise SourceError(f"t.me/s/{username}: {exc}") from exc
+                    self.failed.append(f"{username} ({type(exc).__name__})")
+                    continue
                 if page is None:
                     continue
                 self.pages[username] = page
@@ -57,6 +59,8 @@ class TelegramSource(Source):
                             extra={"place": username, "place_title": page.title, "place_kind": "channel"},
                         )
                     )
+        if self.failed and len(self.failed) == len(self.channels):
+            raise SourceError("ни один канал не открылся: " + ", ".join(self.failed[:5]))
         return posts
 
     async def send_message(self, author_external_id: str, text: str) -> None:

@@ -88,7 +88,7 @@ async def run_search(session: AsyncSession, *, force: bool = False) -> BotRun | 
     running = await session.scalar(
         select(BotRun.id).where(
             BotRun.finished_at.is_(None),
-            BotRun.started_at > datetime.now(UTC) - timedelta(hours=1),
+            BotRun.started_at > datetime.now(UTC) - timedelta(minutes=15),
         )
     )
     if running is not None:
@@ -116,6 +116,10 @@ async def run_search(session: AsyncSession, *, force: bool = False) -> BotRun | 
             logger.add("error", f"{source_name}: ошибка поиска — {exc}")
             await session.commit()
             continue
+        failed = getattr(source, "failed", None)
+        if failed:
+            logger.add("info", f"{source_name}: не открылись каналы — {', '.join(failed[:10])}")
+        logger.add("info", f"{source_name}: просмотрено сообщений — {len(posts)}")
 
         new_leads = 0
         for post in posts:
