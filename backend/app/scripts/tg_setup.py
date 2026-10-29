@@ -12,6 +12,7 @@ import sys
 import httpx
 
 from app.core.config import settings
+from app.core.tg_http import tg_client
 
 
 async def main() -> int:
@@ -28,9 +29,9 @@ async def main() -> int:
         print(f"✗ SITE_URL={settings.site_url} — Telegram требует https-адрес")
         return 1
 
-    api = f"https://api.telegram.org/bot{token}/"
+    api = settings.telegram_api_base.rstrip("/") + f"/bot{token}/"
     url = settings.site_url.rstrip("/") + "/api/webhooks/telegram"
-    async with httpx.AsyncClient(timeout=20) as c:
+    async with tg_client(timeout=20) as c:
         me = (await c.get(api + "getMe")).json()
         if not me.get("ok"):
             print(f"✗ Ключ не подходит: {me.get('description')}")
@@ -59,5 +60,15 @@ async def main() -> int:
     return 0
 
 
+def _run() -> int:
+    try:
+        return asyncio.run(main())
+    except httpx.TransportError as exc:
+        print(f"✗ Сервер не может достучаться до {settings.telegram_api_base}: {type(exc).__name__}")
+        print("  Похоже, хостинг блокирует Telegram. Укажите в .env TELEGRAM_PROXY=socks5://... или")
+        print("  http://user:pass@host:port (зарубежный прокси/VPS) и перезапустите: deploy/update.sh")
+        return 1
+
+
 if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))
+    sys.exit(_run())

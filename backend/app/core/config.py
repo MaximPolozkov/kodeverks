@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     vk_callback_secret: str | None = None
     telegram_bot_token: str | None = None
     telegram_webhook_secret: str | None = None
+    # Прокси только для Telegram (http://user:pass@host:port или socks5://...)
+    telegram_proxy: str | None = None
+    # Альтернативный адрес Bot API (например, свой воркер-прокси)
+    telegram_api_base: str = "https://api.telegram.org"
     serpapi_key: str | None = None
 
     # Бот: LLM (anthropic | openai | none)

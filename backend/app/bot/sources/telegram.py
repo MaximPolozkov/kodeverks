@@ -13,6 +13,7 @@ import httpx
 from app.bot.sources.base import FoundPost, Source, SourceError
 from app.bot.sources.tg_web import ChannelPage, fetch_channel, normalize_username
 from app.core.config import settings
+from app.core.tg_http import tg_api, tg_client
 from app.models.enums import LeadSource
 
 
@@ -35,7 +36,7 @@ class TelegramSource(Source):
         if not self.channels:
             return posts
         headers = {"User-Agent": "Mozilla/5.0 (compatible; KodverkLeadBot/1.0)", "Accept-Language": "ru"}
-        async with httpx.AsyncClient(timeout=self.timeout, headers=headers) as client:
+        async with tg_client(timeout=self.timeout, headers=headers) as client:
             for username in self.channels:
                 try:
                     page = await fetch_channel(client, username)
@@ -61,8 +62,8 @@ class TelegramSource(Source):
     async def send_message(self, author_external_id: str, text: str) -> None:
         if not settings.telegram_bot_token:
             raise SourceError("Telegram: не задан TELEGRAM_BOT_TOKEN")
-        url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage"
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        url = tg_api("sendMessage")
+        async with tg_client(timeout=self.timeout) as client:
             resp = await client.post(
                 url,
                 json={"chat_id": author_external_id, "text": text, "disable_web_page_preview": False},

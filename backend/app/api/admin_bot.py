@@ -269,10 +269,10 @@ async def _get_bot_username() -> str | None:
     if _bot_username or not settings.telegram_bot_token:
         return _bot_username
     try:
-        import httpx
+        from app.core.tg_http import tg_api, tg_client
 
-        async with httpx.AsyncClient(timeout=10) as client:
-            body = (await client.get(f"https://api.telegram.org/bot{settings.telegram_bot_token}/getMe")).json()
+        async with tg_client(timeout=10) as client:
+            body = (await client.get(tg_api("getMe"))).json()
         _bot_username = body.get("result", {}).get("username")
     except Exception:  # noqa: BLE001
         return None
